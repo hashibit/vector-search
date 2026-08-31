@@ -18,14 +18,6 @@
 #include <faiss/impl/FaissException.h>
 #include <faiss/index_io.h>
 
-#ifdef VES_WITH_CUDA
-#include <faiss/gpu/GpuIndexIVFPQ.h>
-#include <faiss/gpu/GpuIndexIVF.h>
-#include <faiss/gpu/GpuCloner.h>
-#include <faiss/gpu/StandardGpuResources.h>
-#include <cuda_runtime.h>
-#endif
-
 #include "vector_search.h"
 
 // The C API moves ids through `long`, faiss through idx_t (int64_t). The two
@@ -38,8 +30,10 @@ namespace ves {
 
 // Every GPU entry point returns -7 when the library is built without CUDA;
 // with VES_WITH_CUDA the GPU paths are implemented against the modern faiss
-// GPU API (>= 1.7, written and checked against the faiss 1.14 headers; NOT
-// compiled or run here, requires a CUDA toolchain).
+// GPU API in src/vector_search_gpu.cpp (>= 1.7, written and checked against
+// the faiss 1.14 headers; NOT compiled or run here, requires a CUDA
+// toolchain). The CPU-only build stubs the whole surface in
+// src/vector_search_gpu_stub.cpp.
 constexpr int kGpuUnavailable = -7;
 
 // ---------------------------------------------------------------------------
@@ -87,37 +81,19 @@ struct CpuIndex {
     faiss::IndexIVFPQ* as_ivfpq() { return dynamic_cast<faiss::IndexIVFPQ*>(index); }
 };
 
-#ifdef VES_WITH_CUDA
-struct GpuResource {
-    int device_id = 0;
-    faiss::gpu::StandardGpuResources* res = nullptr;
+// ---------------------------------------------------------------------------
+// Helpers shared by the CPU and GPU implementations (defined in
+// vector_search.cpp; the GPU TUs are vector_search_gpu.cpp and
+// vector_search_gpu_stub.cpp)
+// ---------------------------------------------------------------------------
 
-    ~GpuResource() { delete res; }
-};
+// CPU index creation shared by init and load (CPU and GPU).
+faiss::IndexIVFPQ* new_ivfpq(const ves_index_config_t& config);
 
-struct GpuIndex {
-    int device_id = 0;
-    GpuResource* resource = nullptr;  // borrowed, not owned
-    faiss::gpu::GpuIndexIVFPQ* index = nullptr;
-    // Modern faiss (>= 1.7) has no setNumProbes; nprobe is applied per search
-    // through SearchParametersIVF. Keep the API's nprobe here.
-    size_t nprobe = 1;
-
-    ~GpuIndex() { delete index; }
-};
-#endif
-
-// Collection of standalone indices. Stubs in the CPU-only build (-7); the
-// semantics below are the natural reading of the header.
-struct Shards {
-    int dimension = 0;
-    int threaded = 0;
-    std::vector<faiss::Index*> indices;  // owned
-
-    ~Shards() {
-        for (faiss::Index* i : indices) delete i;
-    }
-};
+// ves_load_cpu_index / ves_load_gpu_index share this reader.
+// Returns: 0 ok, -1 invalid arg, -2 file not found, -5 bad/corrupt index,
+//          VES_INVALID_HANDLE if the loaded index is not an IndexIVFPQ.
+int read_cpu_index_from_file(const char* path, faiss::Index** out);
 
 // ---------------------------------------------------------------------------
 // Exception mapping (the C boundary must never throw)

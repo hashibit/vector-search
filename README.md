@@ -66,7 +66,12 @@ contract differs.
 
 ```
 include/vector_search.h     C API header (ves_* functions, VES_* error codes)
-src/vector_search.cpp       all ves_* entry points, faiss mapping, error codes
+src/vector_search.cpp       CPU entry points, faiss mapping, error codes
+src/vector_search_gpu.cpp   GPU entry points, CUDA implementation
+                            (compiled when VES_WITH_CUDA=ON)
+src/vector_search_gpu_stub.cpp  GPU entry points as -7 stubs
+                            (compiled when VES_WITH_CUDA=OFF)
+src/ves_gpu_internal.h      GPU-only internals (faiss GPU handles, CUDA includes)
 src/ves_internal.h          handles, id-packing contract, exception mapping
 src/id_filter.h             TimespaceFilter struct and pass logic
 src/ves_search_filter.h/.cpp  filtered IVF-PQ scan (public faiss APIs only)

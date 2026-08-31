@@ -74,10 +74,14 @@ target_include_directories(vector_search
     PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
 target_compile_definitions(vector_search PRIVATE VECTOR_SEARCH_EXPORTS)
+# The GPU surface lives in its own TU (no in-code #ifdef): the CUDA
+# implementation vs the -7 stubs is a file choice here.
 if(VES_WITH_CUDA)
+    target_sources(vector_search PRIVATE src/vector_search_gpu.cpp)
     target_compile_definitions(vector_search PUBLIC VES_WITH_CUDA)
     target_link_libraries(vector_search PRIVATE faiss CUDA::cudart)
 else()
+    target_sources(vector_search PRIVATE src/vector_search_gpu_stub.cpp)
     target_link_libraries(vector_search PRIVATE faiss)
 endif()
 set_target_properties(vector_search PROPERTIES
